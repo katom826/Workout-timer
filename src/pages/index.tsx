@@ -1,7 +1,8 @@
 "use client";
 
-import Button from "../Components/Button";
+import Button from "../components/Button";
 import { useRouter } from "next/navigation";
+import styles from "./index.module.css";
 
 export default function Home() {
   const router = useRouter();
@@ -15,7 +16,7 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen flex flex-col justify-center">
+    <div className={styles.container}>
       <header className="pt-15 flex justify-center">
         <h1 className="text-6xl font-bold bg-linear-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
           筋トレアシスト

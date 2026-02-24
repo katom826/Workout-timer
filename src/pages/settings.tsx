@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Button from "../Components/Button";
+import Button from "../components/Button";
 import { useRouter } from "next/navigation";
 
 export default function Home() {
@@ -40,7 +40,7 @@ export default function Home() {
   const handleChange = (
     index: number,
     key: "name" | "reps" | "duration",
-    value: string
+    value: string,
   ) => {
     setExercises((prev) =>
       prev.map((exercise, i) => {
@@ -53,7 +53,7 @@ export default function Home() {
           ...exercise,
           [key]: updatedValue,
         };
-      })
+      }),
     );
   };
 

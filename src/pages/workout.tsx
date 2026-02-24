@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Button from "../Components/Button";
-import SvgButton from "../Components/SvgButton";
+import Button from "../components/Button";
+import SvgButton from "../components/SvgButton";
 import { useRouter } from "next/navigation";
 
 type Exercise = {
