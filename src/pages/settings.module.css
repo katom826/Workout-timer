@@ -1,0 +1,237 @@
+.page {
+  min-height: 100vh;
+  padding: 20px;
+  background:
+    radial-gradient(circle at 80% 15%, #fed7aa99, transparent 30%),
+    radial-gradient(circle at 10% 80%, #fdba74a3, transparent 35%),
+    linear-gradient(155deg, #fff7ed, #fff1e6 38%, #ffedd5);
+}
+
+.panel {
+  width: min(860px, 100%);
+  margin-inline: auto;
+  border-radius: 24px;
+  border: 2px solid #fdba74;
+  background: linear-gradient(150deg, #ffffffed, #fff7edeb);
+  box-shadow: 0 20px 45px #00000017;
+  padding: clamp(14px, 3vw, 30px);
+}
+
+.loading {
+  font-size: 1.15rem;
+  color: #475569;
+  text-align: center;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  font-size: clamp(1.7rem, 5vw, 2.7rem);
+  color: #9a3412;
+  font-weight: 900;
+}
+
+.backButton {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.section {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.rowFields {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.rowFields .section {
+  margin-top: 0;
+}
+
+.label {
+  font-size: 0.95rem;
+  color: #475569;
+  font-weight: 700;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid #fdba74;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #ffffff, #fff7ed);
+}
+
+.compactNumberInput {
+  width: 3.2em;
+  min-width: 3.2em;
+  height: 3.2em;
+  padding: 0;
+  text-align: center;
+  font-weight: 800;
+}
+
+.cards {
+  margin-top: 20px;
+}
+
+.cardsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.cardsTitle {
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.iconButton {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.card {
+  border: 2px solid #ea580c;
+  background: linear-gradient(140deg, #fff7ed, #fffbeb 45%, #ffffff);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: start;
+  column-gap: 10px;
+  gap: 10px;
+  box-shadow: 0 6px 16px #ea580c24;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.cardDragging {
+  opacity: 0.65;
+  transform: scale(0.985);
+  cursor: grabbing;
+}
+
+.cardDropTarget {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px #c4b5fd;
+}
+
+.dragHandle {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  user-select: none;
+  cursor: grab;
+  touch-action: none;
+  padding: 0;
+  background: transparent;
+}
+
+.cardTopRow {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.nameField {
+  min-width: 0;
+}
+
+.inlineFields {
+  grid-column: 2;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.fieldBlock {
+  display: grid;
+  gap: 8px;
+}
+
+.unitField {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  align-items: center;
+  justify-content: start;
+  gap: 4px;
+}
+
+.unitText {
+  font-weight: 800;
+  color: #9a3412;
+  white-space: nowrap;
+}
+
+.deleteIconButton {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.deleteIconButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 10px;
+  }
+
+  .dragHandle {
+    margin-bottom: 0;
+  }
+}
