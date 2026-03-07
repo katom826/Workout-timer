@@ -23,6 +23,10 @@ const createExercise = (index: number): ExerciseConfig => ({
 
 export default function SettingsPage() {
   const router = useRouter();
+  const backIconPath = `${router.basePath}/arrow_back.svg`;
+  const addIconPath = `${router.basePath}/add.svg`;
+  const dragIconPath = `${router.basePath}/drag_handle.svg`;
+  const deleteIconPath = `${router.basePath}/delete.svg`;
   const [config, setConfig] = useState<WorkoutConfig | null>(null);
   const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null);
   const [dragTargetIndex, setDragTargetIndex] = useState<number | null>(null);
@@ -228,7 +232,7 @@ export default function SettingsPage() {
             onClick={() => router.push("/")}
             aria-label="戻る"
           >
-            <Image src="/arrow_back.svg" alt="" width={22} height={22} />
+            <Image src={backIconPath} alt="" width={22} height={22} />
           </button>
         </header>
 
@@ -298,7 +302,7 @@ export default function SettingsPage() {
               onClick={handleAddExercise}
               aria-label="メニュー追加"
             >
-              <Image src="/add.svg" alt="" width={22} height={22} />
+              <Image src={addIconPath} alt="" width={22} height={22} />
             </button>
           </div>
 
@@ -323,7 +327,7 @@ export default function SettingsPage() {
                 onDragStart={(event) => handleDragStart(event, index)}
                 onTouchStart={(event) => handleTouchStart(event, index)}
               >
-                <Image src="/drag_handle.svg" alt="" width={20} height={20} />
+                <Image src={dragIconPath} alt="" width={20} height={20} />
               </div>
 
               <div className={styles.cardTopRow}>
@@ -404,7 +408,7 @@ export default function SettingsPage() {
                   disabled={config.exercises.length <= 1}
                   aria-label="カードを削除"
                 >
-                  <Image src="/delete.svg" alt="" width={20} height={20} />
+                  <Image src={deleteIconPath} alt="" width={20} height={20} />
                 </button>
               </div>
             </article>

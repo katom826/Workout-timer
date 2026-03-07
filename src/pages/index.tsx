@@ -75,6 +75,7 @@ const getNextStep = (
 
 export default function TimerPage() {
   const router = useRouter();
+  const iconPath = `${router.basePath}/menu.svg`;
   const [config, setConfig] = useState<WorkoutConfig | null>(null);
   const [phase, setPhase] = useState<TimerPhase>("idle");
   const [isRunning, setIsRunning] = useState(false);
@@ -305,7 +306,7 @@ export default function TimerPage() {
               onClick={() => router.push("/settings")}
               aria-label="設定"
             >
-              <Image src="/menu.svg" alt="" width={22} height={22} />
+              <Image src={iconPath} alt="" width={22} height={22} />
             </button>
           )}
 
