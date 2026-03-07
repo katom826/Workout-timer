@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
@@ -224,7 +224,7 @@ export default function TimerPage() {
   if (!config || !currentExercise) {
     return (
       <main className={styles.page}>
-        <p className={styles.loading}>隱ｭ縺ｿ霎ｼ縺ｿ荳ｭ...</p>
+        <p className={styles.loading}>読み込み中...</p>
       </main>
     );
   }
