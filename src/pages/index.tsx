@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import Image from "next/image";
 import { useRouter } from "next/router";
@@ -85,6 +85,10 @@ export default function TimerPage() {
   const [secondsRemaining, setSecondsRemaining] = useState(1);
   const [pendingStep, setPendingStep] = useState<WorkoutStep | null>(null);
   const [workoutFillPhase, setWorkoutFillPhase] = useState<WorkoutFillPhase>("normal");
+  const tickSoundRef = useRef<HTMLAudioElement | null>(null);
+  const repChangeSoundRef = useRef<HTMLAudioElement | null>(null);
+  const clearSoundRef = useRef<HTMLAudioElement | null>(null);
+  const lastSecondsRef = useRef(secondsRemaining);
 
   useEffect(() => {
     const loadedConfig = loadWorkoutConfig();
@@ -109,6 +113,57 @@ export default function TimerPage() {
 
     return () => clearInterval(timer);
   }, [isRunning, phase]);
+
+  useEffect(() => {
+    const previous = lastSecondsRef.current;
+    lastSecondsRef.current = secondsRemaining;
+
+    if (!isRunning || (phase !== "workout" && phase !== "rest")) {
+      return;
+    }
+
+    if (previous === 1 && secondsRemaining === 0) {
+      const audio = repChangeSoundRef.current;
+      if (!audio) {
+        return;
+      }
+      audio.currentTime = 0;
+      const playResult = audio.play();
+      if (playResult) {
+        playResult.catch(() => undefined);
+      }
+      return;
+    }
+
+    if (previous === secondsRemaining + 1 && secondsRemaining > 0) {
+      const audio = tickSoundRef.current;
+      if (!audio) {
+        return;
+      }
+      audio.currentTime = 0;
+      const playResult = audio.play();
+      if (playResult) {
+        playResult.catch(() => undefined);
+      }
+    }
+  }, [isRunning, phase, secondsRemaining]);
+
+  useEffect(() => {
+    if (phase !== "completed") {
+      return;
+    }
+
+    const audio = clearSoundRef.current;
+    if (!audio) {
+      return;
+    }
+
+    audio.currentTime = 0;
+    const playResult = audio.play();
+    if (playResult) {
+      playResult.catch(() => undefined);
+    }
+  }, [phase]);
 
   const currentExercise: ExerciseConfig | null = useMemo(() => {
     if (!config) {
@@ -235,7 +290,8 @@ export default function TimerPage() {
   const totalSeconds = isResting ? Math.max(config.restSeconds, 1) : currentExercise.duration;
   const elapsedRatio = Math.min(1, Math.max(0, (totalSeconds - secondsRemaining) / totalSeconds));
   const remainingRatio = Math.min(1, Math.max(0, secondsRemaining / totalSeconds));
-  const timerFill = isResting ? remainingRatio : elapsedRatio;
+  const isZeroMoment = isRunning && (phase === "workout" || phase === "rest") && secondsRemaining === 0;
+  const timerFill = isZeroMoment ? 1 : isResting ? remainingRatio : elapsedRatio;
   const displaySet = pendingStep ? pendingStep.set : currentSet;
 
   const resetTimer = () => {
@@ -265,6 +321,9 @@ export default function TimerPage() {
 
   return (
     <main className={`${styles.page} ${isResting ? styles.restTheme : styles.workTheme}`}>
+      <audio ref={tickSoundRef} src={`${router.basePath}/audio/tick.mp3`} preload="auto" />
+      <audio ref={repChangeSoundRef} src={`${router.basePath}/audio/rep_change.mp3`} preload="auto" />
+      <audio ref={clearSoundRef} src={`${router.basePath}/audio/clear.mp3`} preload="auto" />
       {isCompleted && (
         <div className={styles.confettiLayer} aria-hidden="true">
           {CONFETTI_ITEMS.map((piece) => (
