@@ -1,4 +1,4 @@
-export type ExerciseConfig = {
+ï»¿export type ExerciseConfig = {
   id: string;
   name: string;
   duration: number;
@@ -17,9 +17,9 @@ export const DEFAULT_WORKOUT_CONFIG: WorkoutConfig = {
   sets: 3,
   restSeconds: 20,
   exercises: [
-    { id: "pushup", name: "˜r—§‚Ä•š‚¹", duration: 30, reps: 10 },
-    { id: "squat", name: "ƒXƒNƒƒbƒg", duration: 30, reps: 15 },
-    { id: "plank", name: "ƒvƒ‰ƒ“ƒN", duration: 40, reps: 1 }
+    { id: "pushup", name: "è…•ç«‹ã¦ä¼ã›", duration: 30, reps: 10 },
+    { id: "squat", name: "ã‚¹ã‚¯ãƒ¯ãƒƒãƒˆ", duration: 30, reps: 15 },
+    { id: "plank", name: "ãƒ—ãƒ©ãƒ³ã‚¯", duration: 40, reps: 1 }
   ]
 };
 
@@ -27,7 +27,7 @@ const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
 const normalizeExercise = (exercise: Partial<ExerciseConfig>, index: number): ExerciseConfig => {
-  const fallbackName = `ƒƒjƒ…[ ${index + 1}`;
+  const fallbackName = `ãƒ¡ãƒ‹ãƒ¥ãƒ¼ ${index + 1}`;
   const rawName = String(exercise.name ?? fallbackName).trim();
 
   return {
@@ -80,3 +80,4 @@ export const saveWorkoutConfig = (config: WorkoutConfig): void => {
 
   localStorage.setItem(WORKOUT_CONFIG_KEY, JSON.stringify(normalizeWorkoutConfig(config)));
 };
+

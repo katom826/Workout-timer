@@ -1,10 +1,75 @@
-﻿<script setup lang="ts">
+﻿<template>
+  <main :class="['page', isResting ? 'restTheme' : 'workTheme']">
+    <ScreenFill
+      v-if="showScreenFill"
+      :fill-ratio-a="fillRatioA"
+      :fill-ratio-b="fillRatioB"
+      :fade-layer="fadeLayer"
+      :fade-token="fadeToken"
+    />
+
+    <audio ref="tickSoundRef" src="/audio/tick.mp3" preload="auto" />
+    <audio ref="repChangeSoundRef" src="/audio/rep_change.mp3" preload="auto" />
+    <audio ref="clearSoundRef" src="/audio/clear.mp3" preload="auto" />
+
+    <ConfettiLayer v-if="isCompleted" :pieces="CONFETTI_ITEMS" />
+
+    <section v-if="!config || !currentExercise" class="timerCard">
+      <p class="loading">読み込み中...</p>
+    </section>
+
+    <section v-else-if="isCompleted" class="completedCard">
+      <h1 class="completedText">おつかれさまでした！</h1>
+      <button type="button" class="primaryButton primaryButtonNoShadow" @click="resetTimer">
+        終了
+      </button>
+    </section>
+
+    <section v-else class="timerCard">
+      <TimerHeader
+        :set-label="setLabel"
+        :show-settings="!isRunning"
+        :on-settings="() => router.push('/settings')"
+      />
+
+      <ExerciseTitle
+        :title="currentExercise.name"
+        :is-resting="isResting"
+        :next-label="nextExercise?.name ?? ''"
+      />
+
+      <TimerDisplay :seconds="displaySeconds" />
+
+      <RepGauge
+        v-if="!isResting"
+        :current-rep="currentRep"
+        :total-reps="currentExercise.reps"
+      />
+
+      <PrimaryAction
+        :label="phase === 'idle' ? 'スタート' : isRunning ? '一時停止' : '再開'"
+        :on-click="handleStartPause"
+        :no-shadow="true"
+      />
+    </section>
+  </main>
+</template>
+
+<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import ConfettiLayer from "~/components/ConfettiLayer.vue";
+import ExerciseTitle from "~/components/ExerciseTitle.vue";
+import PrimaryAction from "~/components/PrimaryAction.vue";
+import RepGauge from "~/components/RepGauge.vue";
+import ScreenFill from "~/components/ScreenFill.vue";
+import TimerDisplay from "~/components/TimerDisplay.vue";
+import TimerHeader from "~/components/TimerHeader.vue";
 import {
   type ExerciseConfig,
   type WorkoutConfig,
   loadWorkoutConfig
 } from "~/utils/workoutConfig";
+import { loadSoundConfig } from "~/utils/soundConfig";
 
 type TimerPhase = "idle" | "workout" | "rest" | "completed";
 
@@ -13,11 +78,8 @@ type WorkoutStep = {
   exerciseIndex: number;
 };
 
-type WorkoutFillPhase = "normal" | "shrinking" | "growing";
-
 const PHASE_TRANSITION_DELAY_MS = 240;
-const REP_PREP_DELAY_MS = 500;
-const FILL_GROW_ANIMATION_MS = 180;
+const REP_PREP_DELAY_MS = 1000;
 
 const confettiPalette = [
   "linear-gradient(180deg, #f97316, #fb7185)",
@@ -78,7 +140,6 @@ const currentExerciseIndex = ref(0);
 const currentRep = ref(1);
 const secondsRemaining = ref(1);
 const pendingStep = ref<WorkoutStep | null>(null);
-const workoutFillPhase = ref<WorkoutFillPhase>("normal");
 const activeFillLayer = ref<0 | 1>(0);
 const fadeLayer = ref<0 | 1>(1);
 const fadeToken = ref(0);
@@ -90,18 +151,43 @@ const clearSoundRef = ref<HTMLAudioElement | null>(null);
 const intervalId = ref<number | null>(null);
 const transitionTimer = ref<number | null>(null);
 const prepTimer = ref<number | null>(null);
-const fillGrowTimer = ref<number | null>(null);
+const seEnabled = ref(true);
+const isPrepDelay = ref(false);
 
-onMounted(() => {
-  const loadedConfig = loadWorkoutConfig();
-  config.value = loadedConfig;
+const syncSoundConfig = () => {
+  const updated = loadSoundConfig();
+  seEnabled.value = updated.seEnabled;
+};
+
+const playSe = (audio: HTMLAudioElement | null) => {
+  if (!audio || !seEnabled.value) {
+    return;
+  }
+  audio.currentTime = 0;
+  const playResult = audio.play();
+  if (playResult) {
+    playResult.catch(() => undefined);
+  }
+};
+
+const applyInitialState = (loadedConfig: WorkoutConfig) => {
   currentSet.value = 1;
   currentExerciseIndex.value = 0;
   currentRep.value = loadedConfig.exercises[0].reps;
   secondsRemaining.value = loadedConfig.exercises[0].duration;
+  pendingStep.value = null;
   phase.value = "idle";
   isRunning.value = false;
-  workoutFillPhase.value = "normal";
+  isPrepDelay.value = false;
+};
+
+onMounted(() => {
+  const loadedConfig = loadWorkoutConfig();
+  config.value = loadedConfig;
+  syncSoundConfig();
+  applyInitialState(loadedConfig);
+  window.addEventListener("sound-config-updated", syncSoundConfig);
+  window.addEventListener("storage", syncSoundConfig);
 });
 
 const currentExercise = computed<ExerciseConfig | null>(() => {
@@ -143,33 +229,13 @@ watch([isRunning, phase], ([running, phaseValue]) => {
 watch(
   () => secondsRemaining.value,
   (next, previous) => {
-    if (!isRunning.value || (phase.value !== "workout" && phase.value !== "rest")) {
-      return;
-    }
-
     if (previous === 1 && next === 0) {
-      const audio = repChangeSoundRef.value;
-      if (!audio) {
-        return;
-      }
-      audio.currentTime = 0;
-      const playResult = audio.play();
-      if (playResult) {
-        playResult.catch(() => undefined);
-      }
+      playSe(repChangeSoundRef.value);
       return;
     }
 
     if (previous === next + 1 && next > 0) {
-      const audio = tickSoundRef.value;
-      if (!audio) {
-        return;
-      }
-      audio.currentTime = 0;
-      const playResult = audio.play();
-      if (playResult) {
-        playResult.catch(() => undefined);
-      }
+      playSe(tickSoundRef.value);
     }
   }
 );
@@ -181,16 +247,7 @@ watch(
       return;
     }
 
-    const audio = clearSoundRef.value;
-    if (!audio) {
-      return;
-    }
-
-    audio.currentTime = 0;
-    const playResult = audio.play();
-    if (playResult) {
-      playResult.catch(() => undefined);
-    }
+    playSe(clearSoundRef.value);
   }
 );
 
@@ -203,10 +260,6 @@ watch(
 
     if (previous === 0) {
       return;
-    }
-
-    if (phase.value === "workout") {
-      workoutFillPhase.value = "shrinking";
     }
 
     if (transitionTimer.value) {
@@ -234,7 +287,6 @@ watch(
         secondsRemaining.value = target.duration;
         pendingStep.value = null;
         phase.value = "workout";
-        workoutFillPhase.value = "growing";
         return;
       }
 
@@ -246,10 +298,11 @@ watch(
         if (prepTimer.value) {
           window.clearTimeout(prepTimer.value);
         }
+        isPrepDelay.value = true;
         prepTimer.value = window.setTimeout(() => {
           currentRep.value = currentRep.value - 1;
           secondsRemaining.value = active.duration;
-          workoutFillPhase.value = "growing";
+          isPrepDelay.value = false;
         }, REP_PREP_DELAY_MS);
         return;
       }
@@ -258,6 +311,7 @@ watch(
       if (!step) {
         phase.value = "completed";
         isRunning.value = false;
+        isPrepDelay.value = false;
         return;
       }
 
@@ -267,33 +321,15 @@ watch(
         currentExerciseIndex.value = step.exerciseIndex;
         currentRep.value = target.reps;
         secondsRemaining.value = target.duration;
-        workoutFillPhase.value = "growing";
+        isPrepDelay.value = false;
         return;
       }
 
       pendingStep.value = step;
       secondsRemaining.value = config.value.restSeconds;
       phase.value = "rest";
-      workoutFillPhase.value = "normal";
+      isPrepDelay.value = false;
     }, PHASE_TRANSITION_DELAY_MS);
-  }
-);
-
-watch(
-  () => workoutFillPhase.value,
-  (next) => {
-    if (next !== "growing") {
-      return;
-    }
-
-    if (fillGrowTimer.value) {
-      window.clearTimeout(fillGrowTimer.value);
-      fillGrowTimer.value = null;
-    }
-
-    fillGrowTimer.value = window.setTimeout(() => {
-      workoutFillPhase.value = "normal";
-    }, FILL_GROW_ANIMATION_MS);
   }
 );
 
@@ -344,6 +380,9 @@ const timerFill = computed(() => {
 });
 
 const displaySet = computed(() => (pendingStep.value ? pendingStep.value.set : currentSet.value));
+const setLabel = computed(() =>
+  !isResting.value && config.value ? `${displaySet.value} / ${config.value.sets} セット` : ""
+);
 
 const fillRatioA = computed(() =>
   activeFillLayer.value === 0 ? timerFill.value : fadeLayer.value === 0 ? 1 : 0
@@ -351,19 +390,13 @@ const fillRatioA = computed(() =>
 const fillRatioB = computed(() =>
   activeFillLayer.value === 1 ? timerFill.value : fadeLayer.value === 1 ? 1 : 0
 );
+const isResumeState = computed(() => !isRunning.value && phase.value !== "idle" && !isCompleted.value);
 
 const resetTimer = () => {
   if (!config.value) {
     return;
   }
-  currentSet.value = 1;
-  currentExerciseIndex.value = 0;
-  currentRep.value = config.value.exercises[0].reps;
-  secondsRemaining.value = config.value.exercises[0].duration;
-  pendingStep.value = null;
-  phase.value = "idle";
-  isRunning.value = false;
-  workoutFillPhase.value = "normal";
+  applyInitialState(config.value);
 };
 
 const handleStartPause = () => {
@@ -380,6 +413,12 @@ const handleStartPause = () => {
   isRunning.value = !isRunning.value;
 };
 
+const showScreenFill = computed(
+  () => isRunning.value && (phase.value === "workout" || phase.value === "rest")
+);
+
+const displaySeconds = computed(() => (isPrepDelay.value ? "Nice!" : String(secondsRemaining.value)));
+
 onBeforeUnmount(() => {
   if (intervalId.value) {
     window.clearInterval(intervalId.value);
@@ -390,126 +429,24 @@ onBeforeUnmount(() => {
   if (prepTimer.value) {
     window.clearTimeout(prepTimer.value);
   }
-  if (fillGrowTimer.value) {
-    window.clearTimeout(fillGrowTimer.value);
-  }
+  window.removeEventListener("sound-config-updated", syncSoundConfig);
+  window.removeEventListener("storage", syncSoundConfig);
 });
 </script>
-
-<template>
-  <main :class="['page', isResting ? 'restTheme' : 'workTheme']">
-    <div class="screenFill" aria-hidden="true">
-      <div
-        :key="`fill-a-${fadeLayer === 0 ? fadeToken : 'static'}`"
-        class="fillLayer"
-        :class="{ fillFade: fadeLayer === 0 }"
-        :style="{ '--fill-ratio': String(fillRatioA) }"
-      />
-      <div
-        :key="`fill-b-${fadeLayer === 1 ? fadeToken : 'static'}`"
-        class="fillLayer"
-        :class="{ fillFade: fadeLayer === 1 }"
-        :style="{ '--fill-ratio': String(fillRatioB) }"
-      />
-    </div>
-
-    <audio ref="tickSoundRef" src="/audio/tick.mp3" preload="auto" />
-    <audio ref="repChangeSoundRef" src="/audio/rep_change.mp3" preload="auto" />
-    <audio ref="clearSoundRef" src="/audio/clear.mp3" preload="auto" />
-
-    <div v-if="isCompleted" class="confettiLayer" aria-hidden="true">
-      <span
-        v-for="piece in CONFETTI_ITEMS"
-        :key="piece.id"
-        class="confetti"
-        :style="{
-          left: piece.left,
-          '--fall-delay': piece.delay,
-          '--fall-duration': piece.duration,
-          '--sway-duration': piece.swayDuration,
-          '--drift-x': piece.drift,
-          '--spin-rot': piece.spin,
-          '--piece-w': piece.width,
-          '--piece-h': piece.height,
-          '--piece-color': piece.color
-        } as CSSProperties"
-      >
-        <span class="confettiInner" />
-      </span>
-    </div>
-
-    <section v-if="!config || !currentExercise" class="timerCard">
-      <p class="loading">読み込み中...</p>
-    </section>
-
-    <section v-else-if="isCompleted" class="completedCard">
-      <h1 class="completedText">おつかれさまでした！</h1>
-      <button type="button" class="primaryButton" @click="resetTimer">終了</button>
-    </section>
-
-    <section v-else class="timerCard">
-      <button
-        v-if="!isRunning"
-        type="button"
-        class="settingsButton"
-        aria-label="設定"
-        @click="router.push('/settings')"
-      >
-        <img src="/menu.svg" alt="" width="22" height="22" />
-      </button>
-
-      <p v-if="!isResting" class="setLabel">{{ displaySet }} / {{ config.sets }} セット</p>
-
-      <h1 class="exerciseName">
-        <template v-if="isResting">
-          <span class="nextPrefix">NEXT</span> {{ nextExercise?.name ?? "" }}
-        </template>
-        <template v-else>
-          {{ currentExercise.name }}
-        </template>
-      </h1>
-
-      <div
-        class="timerPanel"
-        :class="{
-          panelShrink: !isResting && workoutFillPhase === 'shrinking',
-          panelGrow: !isResting && workoutFillPhase === 'growing'
-        }"
-      >
-        <p class="seconds">{{ secondsRemaining }}</p>
-      </div>
-
-      <div v-if="!isResting" class="repSection">
-        <p class="repText">残り回数 {{ currentRep }} / {{ currentExercise.reps }}</p>
-        <div class="repGauge" aria-hidden="true">
-          <span
-            v-for="(_, index) in currentExercise.reps"
-            :key="index"
-            class="repSegment"
-            :class="{ repSegmentActive: index < currentRep }"
-          />
-        </div>
-      </div>
-
-      <button type="button" class="primaryButton" @click="handleStartPause">
-        {{ phase === "idle" ? "スタート" : isRunning ? "一時停止" : "再開" }}
-      </button>
-    </section>
-  </main>
-</template>
 
 <style scoped>
 .page {
   min-height: 100vh;
-  padding: 24px;
+  padding: 28px;
   display: grid;
   place-items: center;
   position: relative;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--theme-main), white 72%), transparent 35%),
-    radial-gradient(circle at 86% 88%, color-mix(in srgb, var(--theme-main), white 80%), transparent 42%),
-    linear-gradient(150deg, #f8fafc, #eef2ff 35%, #e2e8f0);
+  background: linear-gradient(150deg, var(--bg-1), var(--bg-2) 45%, var(--bg-3));
+}
+
+.page::after {
+  content: none;
 }
 
 .workTheme {
@@ -525,23 +462,24 @@ onBeforeUnmount(() => {
 .timerCard,
 .completedCard {
   width: min(680px, 100%);
-  border-radius: 28px;
-  background: transparent;
-  border: 3px solid color-mix(in srgb, var(--theme-main), #ffffff 45%);
-  box-shadow: 0 30px 60px #00000020;
+  border-radius: 30px;
+  background: var(--panel-surface);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
   padding: clamp(20px, 5vw, 44px);
   position: relative;
   z-index: 2;
   overflow: hidden;
+  backdrop-filter: blur(18px);
 }
 
 .loading {
-  color: #4b5563;
+  color: var(--text-muted);
   font-size: 1.2rem;
   font-weight: 700;
 }
 
-.settingsButton {
+:global(.settingsButton) {
   position: absolute;
   top: 20px;
   right: 20px;
@@ -549,54 +487,42 @@ onBeforeUnmount(() => {
   height: 28px;
   display: grid;
   place-items: center;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--theme-main), var(--panel-border) 55%);
   padding: 0;
-  background: transparent;
+  background: color-mix(in srgb, var(--chip-bg) 70%, transparent);
+  border-radius: 50%;
   cursor: pointer;
+  box-shadow: var(--shadow-light);
+  transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
-.setLabel {
+:global(.settingsButton:hover) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-strong);
+}
+
+:global(.setLabel) {
   font-size: clamp(1.3rem, 3vw, 1.9rem);
   font-weight: 800;
   color: var(--theme-main);
 }
 
-.exerciseName {
+:global(.exerciseName) {
   margin-top: 8px;
   font-size: clamp(1.6rem, 4vw, 2.5rem);
   font-weight: 900;
-  color: #0f172a;
+  color: var(--text-primary);
   min-height: 1.8em;
+  letter-spacing: 0.01em;
 }
 
-.nextPrefix {
+:global(.nextPrefix) {
   font-size: 0.52em;
   letter-spacing: 0.08em;
   opacity: 0.75;
 }
 
-.timerPanel {
-  margin-top: 24px;
-  border-radius: 24px;
-  min-height: 280px;
-  position: relative;
-  isolation: isolate;
-  border: 3px solid color-mix(in srgb, var(--theme-main), #ffffff 10%);
-  background: linear-gradient(180deg, #f8fafc, color-mix(in srgb, var(--theme-soft), white 60%));
-  overflow: hidden;
-  transform: scaleY(1);
-  transform-origin: center;
-}
-
-.panelShrink {
-  animation: fillShrinkCenter 140ms cubic-bezier(0.25, 0.8, 0.35, 1) forwards;
-}
-
-.panelGrow {
-  animation: fillGrowCenter 180ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
-}
-
-.seconds {
+:global(.seconds) {
   position: relative;
   z-index: 2;
   min-height: 280px;
@@ -605,38 +531,45 @@ onBeforeUnmount(() => {
   font-size: clamp(4.4rem, 17vw, 9rem);
   font-weight: 900;
   letter-spacing: 0.04em;
-  color: #0f172a;
-  text-shadow: 0 1px 0 #ffffffa1;
+  color: var(--text-primary);
+  text-shadow: 0 1px 0 color-mix(in srgb, var(--panel-border), transparent 40%);
+  font-family: "Space Grotesk", "Noto Sans JP", sans-serif;
 }
 
-.repSection {
+:global(.repSection) {
   margin-top: 18px;
 }
 
-.repText {
+:global(.repText) {
   font-size: 1.3rem;
   font-weight: 800;
-  color: #334155;
+  color: var(--text-soft);
 }
 
-.repGauge {
+:global(.repGauge) {
   margin-top: 10px;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12px, 1fr));
   gap: 6px;
 }
 
-.repSegment {
+:global(.repSegment) {
   height: 16px;
   border-radius: 4px;
-  background: #d1d5db;
+  background: color-mix(in srgb, var(--panel-border), transparent 65%);
+  box-shadow: none;
 }
 
-.repSegmentActive {
-  background: color-mix(in srgb, var(--theme-main), #ffffff 15%);
+:global(.repSegmentActive) {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--theme-main), #ffffff 12%),
+    var(--theme-main)
+  );
+  box-shadow: none;
 }
 
-.primaryButton {
+:global(.primaryButton) {
   margin-top: 26px;
   width: 100%;
   border: none;
@@ -646,11 +579,21 @@ onBeforeUnmount(() => {
   font-weight: 900;
   cursor: pointer;
   color: #ffffff;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--theme-main), #ffffff 18%),
-    var(--theme-main)
-  );
+  background: color-mix(in srgb, #0b1020, var(--theme-main) 18%);
+  box-shadow: none;
+  position: relative;
+  overflow: hidden;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+:global(.primaryButton:hover) {
+  transform: translateY(-1px);
+  box-shadow: none;
+}
+
+:global(.primaryButtonNoShadow),
+:global(.primaryButtonNoShadow:hover) {
+  box-shadow: none;
 }
 
 .completedCard {
@@ -660,10 +603,10 @@ onBeforeUnmount(() => {
 .completedText {
   font-size: clamp(2.2rem, 8vw, 4.2rem);
   font-weight: 900;
-  color: #0f172a;
+  color: var(--text-primary);
 }
 
-.confettiLayer {
+:global(.confettiLayer) {
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -671,7 +614,7 @@ onBeforeUnmount(() => {
   z-index: 18;
 }
 
-.confetti {
+:global(.confetti) {
   position: absolute;
   top: -14vh;
   width: var(--piece-w);
@@ -680,7 +623,7 @@ onBeforeUnmount(() => {
   will-change: transform;
 }
 
-.confettiInner {
+:global(.confettiInner) {
   display: block;
   width: 100%;
   height: 100%;
@@ -715,48 +658,31 @@ onBeforeUnmount(() => {
   }
 }
 
-@keyframes fillShrinkCenter {
-  from {
-    transform: scaleY(1);
-  }
 
-  to {
-    transform: scaleY(0);
-  }
-}
-
-@keyframes fillGrowCenter {
-  from {
-    transform: scaleY(0);
-  }
-
-  to {
-    transform: scaleY(1);
-  }
-}
-
-.screenFill {
+:global(.screenFill) {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
+  mix-blend-mode: multiply;
 }
 
-.fillLayer {
+:global(.fillLayer) {
   position: absolute;
   inset-inline: 0;
   inset-block-end: 0;
   block-size: calc(var(--fill-ratio) * 100%);
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--theme-main), #ffffff 18%),
-    var(--theme-main)
+    color-mix(in srgb, var(--theme-main), #ffffff 30%),
+    color-mix(in srgb, var(--theme-main), #0f172a 5%)
   );
   transition: block-size 1000ms linear;
   opacity: 1;
+  box-shadow: 0 -30px 60px color-mix(in srgb, var(--theme-main), transparent 60%);
 }
 
-.fillFade {
+:global(.fillFade) {
   animation: fillFadeOut 900ms ease-out forwards;
 }
 
@@ -772,17 +698,13 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .page {
-    padding: 14px;
+    padding: 16px;
   }
 
   .timerCard,
   .completedCard {
     border-radius: 20px;
     padding: 16px;
-  }
-
-  .timerPanel {
-    min-height: 230px;
   }
 
   .seconds {
@@ -795,4 +717,6 @@ onBeforeUnmount(() => {
   }
 }
 </style>
+
+
 
