@@ -17,21 +17,26 @@ export const DEFAULT_WORKOUT_CONFIG: WorkoutConfig = {
   sets: 3,
   restSeconds: 20,
   exercises: [
-    { id: "pushup", name: "閻慕ｫ九※莨上○", duration: 30, reps: 10 },
-    { id: "squat", name: "繧ｹ繧ｯ繝ｯ繝�繝�", duration: 30, reps: 15 },
-    { id: "plank", name: "繝励Λ繝ｳ繧ｯ", duration: 40, reps: 1 },
-  ],
+    { id: "pushup", name: "腕立て伏せ", duration: 30, reps: 10 },
+    { id: "squat", name: "スクワット", duration: 30, reps: 15 },
+    { id: "plank", name: "プランク", duration: 40, reps: 1 }
+  ]
 };
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
-const normalizeExercise = (exercise: Partial<ExerciseConfig>, index: number): ExerciseConfig => ({
-  id: exercise.id ?? `exercise-${index}-${Date.now()}`,
-  name: String(exercise.name ?? `繝｡繝九Η繝ｼ ${index + 1}`).trim() || `繝｡繝九Η繝ｼ ${index + 1}`,
-  duration: clamp(Number(exercise.duration) || 1, 1, 3600),
-  reps: clamp(Number(exercise.reps) || 1, 1, 999),
-});
+const normalizeExercise = (exercise: Partial<ExerciseConfig>, index: number): ExerciseConfig => {
+  const fallbackName = `メニュー ${index + 1}`;
+  const rawName = String(exercise.name ?? fallbackName).trim();
+
+  return {
+    id: exercise.id ?? `exercise-${index}-${Date.now()}`,
+    name: rawName || fallbackName,
+    duration: clamp(Number(exercise.duration) || 1, 1, 3600),
+    reps: clamp(Number(exercise.reps) || 1, 1, 999)
+  };
+};
 
 export const normalizeWorkoutConfig = (config: Partial<WorkoutConfig>): WorkoutConfig => {
   const exercisesSource = Array.isArray(config.exercises) ? config.exercises : [];
@@ -44,14 +49,14 @@ export const normalizeWorkoutConfig = (config: Partial<WorkoutConfig>): WorkoutC
     restSeconds: clamp(
       Number(config.restSeconds) || DEFAULT_WORKOUT_CONFIG.restSeconds,
       0,
-      600,
+      600
     ),
-    exercises,
+    exercises
   };
 };
 
 export const loadWorkoutConfig = (): WorkoutConfig => {
-  if (typeof window === "undefined") {
+  if (import.meta.server) {
     return DEFAULT_WORKOUT_CONFIG;
   }
 
@@ -69,7 +74,7 @@ export const loadWorkoutConfig = (): WorkoutConfig => {
 };
 
 export const saveWorkoutConfig = (config: WorkoutConfig): void => {
-  if (typeof window === "undefined") {
+  if (import.meta.server) {
     return;
   }
 
