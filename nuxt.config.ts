@@ -5,6 +5,9 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   srcDir: '.',
   css: ['@/assets/css/reset.css', '@/assets/css/theme.css'],
+  app: {
+    baseURL: '/Workout-timer/'
+  },
   vite: {
     optimizeDeps: {
       noDiscovery: true,
