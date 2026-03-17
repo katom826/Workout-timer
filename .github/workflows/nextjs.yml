@@ -1,4 +1,4 @@
-name: Deploy Next.js site to Pages
+name: Deploy Nuxt site to Pages
 
 on:
   push:
@@ -22,11 +22,11 @@ jobs:
           node-version: 20
 
       - run: npm ci
-      - run: npm run build
+      - run: npm run generate
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: out
+          path: .output/public
 
   deploy:
     needs: build
