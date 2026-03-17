@@ -55,13 +55,6 @@
       </div>
 
       <section class="cards">
-        <div class="cardsHeader">
-          <h2 class="cardsTitle">メニュー ({{ exerciseCount }}種)</h2>
-          <button type="button" class="iconButton" aria-label="メニュー追加" @click="handleAddExercise">
-            <img src="/add.svg" alt="" width="22" height="22" />
-          </button>
-        </div>
-
         <article
           v-for="(exercise, index) in config.exercises"
           :key="exercise.id"
@@ -162,6 +155,10 @@
             </button>
           </div>
         </article>
+
+        <button type="button" class="addCardButton" @click="handleAddExercise">
+          メニュー追加
+        </button>
       </section>
     </section>
   </main>
@@ -181,7 +178,7 @@ const router = useRouter();
 
 const createExercise = (index: number): ExerciseConfig => ({
   id: `custom-${Date.now()}-${index}`,
-  name: `遞ｮ逶ｮ ${index + 1}`,
+  name: `メニュー ${index + 1}`,
   duration: 5,
   reps: 5
 });
@@ -206,8 +203,6 @@ watch(
   },
   { deep: true }
 );
-
-const exerciseCount = computed(() => config.value?.exercises.length ?? 0);
 
 const setSets = (nextValue: number) => {
   if (!config.value) {
@@ -554,38 +549,6 @@ const handleRestInput = (event: Event) => {
   margin-top: 20px;
 }
 
-.cardsHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.cardsTitle {
-  font-size: 1.35rem;
-  font-weight: 900;
-  color: var(--text-primary);
-}
-
-.iconButton {
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--chip-border);
-  padding: 0;
-  background: color-mix(in srgb, var(--chip-bg), transparent 15%);
-  cursor: pointer;
-  border-radius: 50%;
-  box-shadow: var(--shadow-light);
-  transition: transform 160ms ease, box-shadow 160ms ease;
-}
-
-.iconButton:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-strong);
-}
-
 .card {
   border: 1px solid color-mix(in srgb, var(--panel-border), transparent 30%);
   background: linear-gradient(140deg, var(--surface-1), var(--surface-2) 45%, var(--surface-1));
@@ -694,6 +657,26 @@ const handleRestInput = (event: Event) => {
 .deleteIconButton:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.addCardButton {
+  width: 100%;
+  border: 1px dashed color-mix(in srgb, var(--theme-main), #ffffff 35%);
+  background: color-mix(in srgb, var(--surface-1), transparent 30%);
+  color: var(--text-primary);
+  font-weight: 800;
+  font-size: 1.05rem;
+  border-radius: 16px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  box-shadow: var(--shadow-light);
+}
+
+.addCardButton:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-strong);
+  border-color: color-mix(in srgb, var(--theme-main), #ffffff 15%);
 }
 
 .visuallyHidden {

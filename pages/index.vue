@@ -1,13 +1,5 @@
 ﻿<template>
   <main :class="['page', isResting ? 'restTheme' : 'workTheme']">
-    <ScreenFill
-      v-if="showScreenFill"
-      :fill-ratio-a="fillRatioA"
-      :fill-ratio-b="fillRatioB"
-      :fade-layer="fadeLayer"
-      :fade-token="fadeToken"
-    />
-
     <audio ref="tickSoundRef" src="/audio/tick.mp3" preload="auto" />
     <audio ref="repChangeSoundRef" src="/audio/rep_change.mp3" preload="auto" />
     <audio ref="clearSoundRef" src="/audio/clear.mp3" preload="auto" />
@@ -18,37 +10,41 @@
       <p class="loading">読み込み中...</p>
     </section>
 
-    <section v-else-if="isCompleted" class="completedCard">
-      <h1 class="completedText">おつかれさまでした！</h1>
-      <button type="button" class="primaryButton primaryButtonNoShadow" @click="resetTimer">
-        終了
-      </button>
-    </section>
-
     <section v-else class="timerCard">
       <TimerHeader
-        :set-label="setLabel"
-        :show-settings="!isRunning"
+        v-if="!isCompleted"
+        :current-exercise-name="currentExercise?.name ?? ''"
+        :next-exercise-name="nextExercise?.name ?? ''"
+        :is-resting="isResting"
+        :is-running="isRunning"
+        :show-settings="!isRunning && !isCompleted"
         :on-settings="() => router.push('/settings')"
       />
 
-      <ExerciseTitle
-        :title="currentExercise.name"
-        :is-resting="isResting"
-        :next-label="nextExercise?.name ?? ''"
+      <TimerDisplay
+        :seconds="displaySeconds"
+        :show-fill="showScreenFill"
+        :fill-ratio-a="fillRatioA"
+        :fill-ratio-b="fillRatioB"
+        :fade-layer="fadeLayer"
+        :fade-token="fadeToken"
+        :is-nice="isNiceMoment"
+        :is-completed="isCompleted"
       />
 
-      <TimerDisplay :seconds="displaySeconds" />
-
-      <RepGauge
-        v-if="!isResting"
-        :current-rep="currentRep"
-        :total-reps="currentExercise.reps"
-      />
+      <Transition name="repFade">
+        <RepGauge
+          v-if="!isResting && !isCompleted"
+          :current-rep="currentRep"
+          :total-reps="currentExercise.reps"
+          :set-label="setLabel"
+          :pulse-index="repPulseIndex"
+        />
+      </Transition>
 
       <PrimaryAction
-        :label="phase === 'idle' ? 'スタート' : isRunning ? '一時停止' : '再開'"
-        :on-click="handleStartPause"
+        :label="isCompleted ? '終了' : phase === 'idle' ? 'スタート' : isRunning ? '一時停止' : '再開'"
+        :on-click="isCompleted ? resetTimer : handleStartPause"
         :no-shadow="true"
       />
     </section>
@@ -58,10 +54,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import ConfettiLayer from "~/components/ConfettiLayer.vue";
-import ExerciseTitle from "~/components/ExerciseTitle.vue";
 import PrimaryAction from "~/components/PrimaryAction.vue";
 import RepGauge from "~/components/RepGauge.vue";
-import ScreenFill from "~/components/ScreenFill.vue";
 import TimerDisplay from "~/components/TimerDisplay.vue";
 import TimerHeader from "~/components/TimerHeader.vue";
 import {
@@ -80,6 +74,7 @@ type WorkoutStep = {
 
 const PHASE_TRANSITION_DELAY_MS = 240;
 const REP_PREP_DELAY_MS = 1000;
+const COMPLETION_DELAY_MS = 900;
 
 const confettiPalette = [
   "linear-gradient(180deg, #f97316, #fb7185)",
@@ -139,6 +134,7 @@ const currentSet = ref(1);
 const currentExerciseIndex = ref(0);
 const currentRep = ref(1);
 const secondsRemaining = ref(1);
+const countdownRemainingMs = ref(0);
 const pendingStep = ref<WorkoutStep | null>(null);
 const activeFillLayer = ref<0 | 1>(0);
 const fadeLayer = ref<0 | 1>(1);
@@ -148,11 +144,148 @@ const tickSoundRef = ref<HTMLAudioElement | null>(null);
 const repChangeSoundRef = ref<HTMLAudioElement | null>(null);
 const clearSoundRef = ref<HTMLAudioElement | null>(null);
 
-const intervalId = ref<number | null>(null);
+const rafId = ref<number | null>(null);
+const countdownEndAt = ref<number | null>(null);
+const countdownFinished = ref(false);
 const transitionTimer = ref<number | null>(null);
 const prepTimer = ref<number | null>(null);
 const seEnabled = ref(true);
 const isPrepDelay = ref(false);
+const repPulseIndex = ref<number | null>(null);
+
+const nowMs = (): number => performance.now();
+
+const setCountdown = (seconds: number) => {
+  secondsRemaining.value = seconds;
+  countdownRemainingMs.value = Math.max(0, seconds * 1000);
+  countdownEndAt.value = null;
+  countdownFinished.value = false;
+};
+
+const stopCountdownLoop = () => {
+  if (rafId.value) {
+    window.cancelAnimationFrame(rafId.value);
+    rafId.value = null;
+  }
+};
+
+const startCountdownLoop = () => {
+  stopCountdownLoop();
+  rafId.value = window.requestAnimationFrame(updateCountdown);
+};
+
+const updateCountdown = () => {
+  if (!isRunning.value || (phase.value !== "workout" && phase.value !== "rest") || isPrepDelay.value) {
+    stopCountdownLoop();
+    return;
+  }
+
+  const now = nowMs();
+  if (countdownEndAt.value === null) {
+    const baseMs = countdownRemainingMs.value || secondsRemaining.value * 1000;
+    countdownEndAt.value = now + baseMs;
+  }
+
+  const remainingMs = countdownEndAt.value - now;
+  countdownRemainingMs.value = Math.max(0, remainingMs);
+  if (remainingMs <= 0) {
+    if (secondsRemaining.value !== 0) {
+      secondsRemaining.value = 0;
+    }
+    if (!countdownFinished.value) {
+      countdownFinished.value = true;
+      handleCountdownComplete();
+    }
+  } else {
+    const nextSeconds = Math.ceil(remainingMs / 1000);
+    if (nextSeconds !== secondsRemaining.value) {
+      secondsRemaining.value = nextSeconds;
+    }
+  }
+
+  rafId.value = window.requestAnimationFrame(updateCountdown);
+};
+
+const handleCountdownComplete = () => {
+  if (!config.value || !isRunning.value) {
+    return;
+  }
+
+  if (transitionTimer.value) {
+    window.clearTimeout(transitionTimer.value);
+    transitionTimer.value = null;
+  }
+
+  transitionTimer.value = window.setTimeout(() => {
+    const active = config.value?.exercises[currentExerciseIndex.value];
+    if (!active) {
+      return;
+    }
+
+    const completeWorkout = () => {
+      window.setTimeout(() => {
+        phase.value = "completed";
+        isRunning.value = false;
+      }, COMPLETION_DELAY_MS);
+    };
+
+    if (phase.value === "rest") {
+      if (!pendingStep.value) {
+        completeWorkout();
+        return;
+      }
+
+      const target = config.value.exercises[pendingStep.value.exerciseIndex];
+      currentSet.value = pendingStep.value.set;
+      currentExerciseIndex.value = pendingStep.value.exerciseIndex;
+      currentRep.value = target.reps;
+      setCountdown(target.duration);
+      pendingStep.value = null;
+      phase.value = "workout";
+      return;
+    }
+
+    if (phase.value !== "workout") {
+      return;
+    }
+
+    if (currentRep.value > 1) {
+      if (prepTimer.value) {
+        window.clearTimeout(prepTimer.value);
+      }
+      isPrepDelay.value = true;
+      countdownRemainingMs.value = 0;
+      prepTimer.value = window.setTimeout(() => {
+        currentRep.value = currentRep.value - 1;
+        setCountdown(active.duration);
+        isPrepDelay.value = false;
+      }, REP_PREP_DELAY_MS);
+      return;
+    }
+
+    const step = getNextStep(currentSet.value, currentExerciseIndex.value, config.value);
+    if (!step) {
+      completeWorkout();
+      isPrepDelay.value = false;
+      return;
+    }
+
+    if (config.value.restSeconds <= 0) {
+      const target = config.value.exercises[step.exerciseIndex];
+      currentSet.value = step.set;
+      currentExerciseIndex.value = step.exerciseIndex;
+      currentRep.value = target.reps;
+      setCountdown(target.duration);
+      isPrepDelay.value = false;
+      return;
+    }
+
+    pendingStep.value = step;
+    setCountdown(config.value.restSeconds);
+    phase.value = "rest";
+    isPrepDelay.value = false;
+  }, PHASE_TRANSITION_DELAY_MS);
+};
 
 const syncSoundConfig = () => {
   const updated = loadSoundConfig();
@@ -174,7 +307,7 @@ const applyInitialState = (loadedConfig: WorkoutConfig) => {
   currentSet.value = 1;
   currentExerciseIndex.value = 0;
   currentRep.value = loadedConfig.exercises[0].reps;
-  secondsRemaining.value = loadedConfig.exercises[0].duration;
+  setCountdown(loadedConfig.exercises[0].duration);
   pendingStep.value = null;
   phase.value = "idle";
   isRunning.value = false;
@@ -203,7 +336,8 @@ const nextExercise = computed<ExerciseConfig | null>(() => {
     return null;
   }
 
-  const step = pendingStep.value ?? getNextStep(currentSet.value, currentExerciseIndex.value, config.value);
+  const step =
+    pendingStep.value ?? getNextStep(currentSet.value, currentExerciseIndex.value, config.value);
   if (!step) {
     return null;
   }
@@ -211,20 +345,36 @@ const nextExercise = computed<ExerciseConfig | null>(() => {
   return config.value.exercises[step.exerciseIndex] ?? null;
 });
 
-watch([isRunning, phase], ([running, phaseValue]) => {
-  if (intervalId.value) {
-    window.clearInterval(intervalId.value);
-    intervalId.value = null;
-  }
-
-  if (!running || (phaseValue !== "workout" && phaseValue !== "rest")) {
+watch([isRunning, phase, isPrepDelay], ([running, phaseValue, prep]) => {
+  if (!running || prep || (phaseValue !== "workout" && phaseValue !== "rest")) {
+    if (countdownEndAt.value !== null) {
+      const remainingMs = Math.max(0, countdownEndAt.value - nowMs());
+      countdownRemainingMs.value = remainingMs;
+      secondsRemaining.value = Math.max(0, Math.ceil(remainingMs / 1000));
+    }
+    countdownEndAt.value = null;
+    stopCountdownLoop();
     return;
   }
 
-  intervalId.value = window.setInterval(() => {
-    secondsRemaining.value = Math.max(secondsRemaining.value - 1, 0);
-  }, 1000);
+  startCountdownLoop();
 });
+
+watch(
+  () => currentRep.value,
+  (next, previous) => {
+    if (typeof previous !== "number" || next >= previous) {
+      return;
+    }
+
+    repPulseIndex.value = previous - 1;
+    window.setTimeout(() => {
+      if (repPulseIndex.value === previous - 1) {
+        repPulseIndex.value = null;
+      }
+    }, 280);
+  }
+);
 
 watch(
   () => secondsRemaining.value,
@@ -254,88 +404,6 @@ watch(
 watch(
   () => secondsRemaining.value,
   (next, previous) => {
-    if (!config.value || !isRunning.value || next > 0) {
-      return;
-    }
-
-    if (previous === 0) {
-      return;
-    }
-
-    if (transitionTimer.value) {
-      window.clearTimeout(transitionTimer.value);
-      transitionTimer.value = null;
-    }
-
-    transitionTimer.value = window.setTimeout(() => {
-      const active = config.value?.exercises[currentExerciseIndex.value];
-      if (!active) {
-        return;
-      }
-
-      if (phase.value === "rest") {
-        if (!pendingStep.value) {
-          phase.value = "completed";
-          isRunning.value = false;
-          return;
-        }
-
-        const target = config.value.exercises[pendingStep.value.exerciseIndex];
-        currentSet.value = pendingStep.value.set;
-        currentExerciseIndex.value = pendingStep.value.exerciseIndex;
-        currentRep.value = target.reps;
-        secondsRemaining.value = target.duration;
-        pendingStep.value = null;
-        phase.value = "workout";
-        return;
-      }
-
-      if (phase.value !== "workout") {
-        return;
-      }
-
-      if (currentRep.value > 1) {
-        if (prepTimer.value) {
-          window.clearTimeout(prepTimer.value);
-        }
-        isPrepDelay.value = true;
-        prepTimer.value = window.setTimeout(() => {
-          currentRep.value = currentRep.value - 1;
-          secondsRemaining.value = active.duration;
-          isPrepDelay.value = false;
-        }, REP_PREP_DELAY_MS);
-        return;
-      }
-
-      const step = getNextStep(currentSet.value, currentExerciseIndex.value, config.value);
-      if (!step) {
-        phase.value = "completed";
-        isRunning.value = false;
-        isPrepDelay.value = false;
-        return;
-      }
-
-      if (config.value.restSeconds <= 0) {
-        const target = config.value.exercises[step.exerciseIndex];
-        currentSet.value = step.set;
-        currentExerciseIndex.value = step.exerciseIndex;
-        currentRep.value = target.reps;
-        secondsRemaining.value = target.duration;
-        isPrepDelay.value = false;
-        return;
-      }
-
-      pendingStep.value = step;
-      secondsRemaining.value = config.value.restSeconds;
-      phase.value = "rest";
-      isPrepDelay.value = false;
-    }, PHASE_TRANSITION_DELAY_MS);
-  }
-);
-
-watch(
-  () => secondsRemaining.value,
-  (next, previous) => {
     if (!isRunning.value || (phase.value !== "workout" && phase.value !== "rest")) {
       return;
     }
@@ -358,12 +426,22 @@ const totalSeconds = computed(() => {
   return isResting.value ? Math.max(config.value.restSeconds, 1) : currentExercise.value.duration;
 });
 
-const elapsedRatio = computed(() =>
-  Math.min(1, Math.max(0, (totalSeconds.value - secondsRemaining.value) / totalSeconds.value))
-);
-const remainingRatio = computed(() =>
-  Math.min(1, Math.max(0, secondsRemaining.value / totalSeconds.value))
-);
+const totalMs = computed(() => totalSeconds.value * 1000);
+const elapsedRatio = computed(() => {
+  if (totalMs.value <= 0) {
+    return 0;
+  }
+  return Math.min(
+    1,
+    Math.max(0, (totalMs.value - countdownRemainingMs.value) / totalMs.value)
+  );
+});
+const remainingRatio = computed(() => {
+  if (totalMs.value <= 0) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, countdownRemainingMs.value / totalMs.value));
+});
 
 const isZeroMoment = computed(
   () =>
@@ -371,6 +449,8 @@ const isZeroMoment = computed(
     (phase.value === "workout" || phase.value === "rest") &&
     secondsRemaining.value === 0
 );
+
+const isNiceMoment = computed(() => isPrepDelay.value || isZeroMoment.value);
 
 const timerFill = computed(() => {
   if (isZeroMoment.value) {
@@ -417,12 +497,21 @@ const showScreenFill = computed(
   () => isRunning.value && (phase.value === "workout" || phase.value === "rest")
 );
 
-const displaySeconds = computed(() => (isPrepDelay.value ? "Nice!" : String(secondsRemaining.value)));
+const displaySeconds = computed(() => {
+  if (isCompleted.value) {
+    return "おつかれさまでした！";
+  }
+  if (isZeroMoment.value && isResting.value) {
+    return "Fight!";
+  }
+  if (isNiceMoment.value) {
+    return "Nice!";
+  }
+  return String(secondsRemaining.value);
+});
 
 onBeforeUnmount(() => {
-  if (intervalId.value) {
-    window.clearInterval(intervalId.value);
-  }
+  stopCountdownLoop();
   if (transitionTimer.value) {
     window.clearTimeout(transitionTimer.value);
   }
@@ -473,6 +562,10 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(18px);
 }
 
+.timerCard {
+  padding-top: calc(clamp(20px, 5vw, 44px) + 18px);
+}
+
 .loading {
   color: var(--text-muted);
   font-size: 1.2rem;
@@ -507,6 +600,34 @@ onBeforeUnmount(() => {
   color: var(--theme-main);
 }
 
+:global(.currentExerciseLabel) {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #f97316;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+:global(.nextInlineLabel) {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  opacity: 0.9;
+  letter-spacing: 0.02em;
+  margin-left: auto;
+  text-align: right;
+}
+
+:global(.nextRestLabel) {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+}
+
 :global(.exerciseName) {
   margin-top: 8px;
   font-size: clamp(1.6rem, 4vw, 2.5rem);
@@ -526,14 +647,53 @@ onBeforeUnmount(() => {
   position: relative;
   z-index: 2;
   min-height: 280px;
+  margin-top: 12px;
   display: grid;
   place-items: center;
-  font-size: clamp(4.4rem, 17vw, 9rem);
+  font-size: clamp(5.2rem, 19vw, 11rem);
   font-weight: 900;
   letter-spacing: 0.04em;
   color: var(--text-primary);
   text-shadow: 0 1px 0 color-mix(in srgb, var(--panel-border), transparent 40%);
   font-family: "Space Grotesk", "Noto Sans JP", sans-serif;
+  border: 2px solid color-mix(in srgb, var(--theme-main), #ffffff 35%);
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+:global(.secondsCompleted) {
+  font-size: 1.3rem;
+  letter-spacing: 0.01em;
+  min-height: 180px;
+  text-align: center;
+  padding: 0 16px;
+}
+
+:global(.secondsText) {
+  position: relative;
+  z-index: 2;
+  display: inline-block;
+  animation: secondsPop 220ms ease-out;
+}
+
+:global(.secondsNice .fillLayer) {
+  transition: none;
+}
+
+@keyframes secondsPop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 
 :global(.repSection) {
@@ -541,9 +701,19 @@ onBeforeUnmount(() => {
 }
 
 :global(.repText) {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
   font-size: 1.3rem;
   font-weight: 800;
   color: var(--text-soft);
+}
+
+:global(.repSetLabel) {
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
 }
 
 :global(.repGauge) {
@@ -551,6 +721,17 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12px, 1fr));
   gap: 6px;
+}
+
+:global(.repFade-enter-active),
+:global(.repFade-leave-active) {
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+
+:global(.repFade-enter-from),
+:global(.repFade-leave-to) {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 :global(.repSegment) {
@@ -567,6 +748,22 @@ onBeforeUnmount(() => {
     var(--theme-main)
   );
   box-shadow: none;
+}
+
+:global(.repSegmentExit) {
+  animation: repSegmentExit 260ms ease-out;
+}
+
+@keyframes repSegmentExit {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(0.7);
+    opacity: 0.2;
+  }
 }
 
 :global(.primaryButton) {
@@ -658,7 +855,6 @@ onBeforeUnmount(() => {
   }
 }
 
-
 :global(.screenFill) {
   position: absolute;
   inset: 0;
@@ -695,6 +891,7 @@ onBeforeUnmount(() => {
     opacity: 0;
   }
 }
+
 
 @media (max-width: 640px) {
   .page {

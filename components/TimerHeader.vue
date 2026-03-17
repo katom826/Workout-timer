@@ -9,12 +9,26 @@
     <img src="/menu.svg" alt="" width="22" height="22" />
   </button>
 
-  <p v-if="setLabel" class="setLabel">{{ setLabel }}</p>
+  <p v-if="currentExerciseName || nextExerciseName" class="currentExerciseLabel">
+    <template v-if="isResting">
+      <span v-if="nextExerciseName" class="nextRestLabel">Next {{ nextExerciseName }}</span>
+    </template>
+    <template v-else>
+      <span>{{ currentExerciseName }}</span>
+      <span v-if="isRunning && nextExerciseName" class="nextInlineLabel">
+        Next {{ nextExerciseName }}
+      </span>
+    </template>
+  </p>
+
 </template>
 
 <script setup lang="ts">
 defineProps<{
-  setLabel: string;
+  currentExerciseName: string;
+  nextExerciseName: string;
+  isResting: boolean;
+  isRunning: boolean;
   showSettings: boolean;
   onSettings: () => void;
 }>();
