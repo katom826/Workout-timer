@@ -659,6 +659,7 @@ onBeforeUnmount(() => {
   border: 2px solid color-mix(in srgb, var(--theme-main), #ffffff 35%);
   border-radius: 22px;
   overflow: hidden;
+  isolation: isolate;
 }
 
 :global(.secondsCompleted) {
@@ -876,6 +877,9 @@ onBeforeUnmount(() => {
   transition: block-size 1000ms linear;
   opacity: 1;
   box-shadow: 0 -30px 60px color-mix(in srgb, var(--theme-main), transparent 60%);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: block-size;
 }
 
 :global(.fillFade) {
