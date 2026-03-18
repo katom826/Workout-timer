@@ -1,4 +1,4 @@
-﻿@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap");
 
 :root {
   color-scheme: light dark;
@@ -70,8 +70,6 @@ body {
   background-color: var(--bg-1);
 }
 
-.seconds {
-  font-family: "Space Grotesk", "Noto Sans JP", sans-serif;
-}
+
 
 

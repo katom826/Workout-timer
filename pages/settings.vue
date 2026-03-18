@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <main class="page">
     <section v-if="!config" class="panel">
       <p class="loading">読み込み中...</p>
@@ -7,14 +7,16 @@
     <section v-else class="panel">
       <header class="header">
         <div class="headerTitle">
-          <h1 class="title">タイマー設定</h1>
-          <button type="button" class="soundButton" @click="router.push('/sound')">
-            サウンド設定
+          <h1 class="title">メニュー設定</h1>
+        </div>
+        <div class="headerActions">
+          <button type="button" class="soundButton" aria-label="サウンド設定" @click="router.push('/sound')">
+            <img src="/music.svg" alt="" width="22" height="22" />
+          </button>
+          <button type="button" class="backButton" aria-label="戻る" @click="router.push('/')">
+            <img src="/arrow_back.svg" alt="" width="22" height="22" />
           </button>
         </div>
-        <button type="button" class="backButton" aria-label="戻る" @click="router.push('/')">
-          <img src="/arrow_back.svg" alt="" width="22" height="22" />
-        </button>
       </header>
 
       <div class="rowFields">
@@ -156,8 +158,8 @@
           </div>
         </article>
 
-        <button type="button" class="addCardButton" @click="handleAddExercise">
-          メニュー追加
+        <button type="button" class="addCardButton" aria-label="メニュー追加" @click="handleAddExercise">
+          <img src="/add.svg" alt="" width="22" height="22" />
         </button>
       </section>
     </section>
@@ -408,10 +410,9 @@ const handleRestInput = (event: Event) => {
 <style scoped>
 .page {
   min-height: 100vh;
-  padding: 24px;
+  padding: clamp(16px, 3vw, 24px);
   --theme-main: #f97316;
-  background:
-    linear-gradient(160deg, var(--bg-1), var(--bg-2) 45%, var(--bg-3));
+  background: rgb(33, 33, 33);
   position: relative;
   overflow: hidden;
 }
@@ -421,21 +422,19 @@ const handleRestInput = (event: Event) => {
 }
 
 .panel {
-  width: min(860px, 100%);
+  width: min(760px, 100%);
   margin-inline: auto;
-  border-radius: 26px;
-  border: 1px solid var(--panel-border);
-  background: var(--panel-surface);
-  box-shadow: var(--panel-shadow-soft);
-  padding: clamp(14px, 3vw, 30px);
+  border-radius: 28px;
+  background: rgb(48, 48, 48);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+  padding: clamp(20px, 4vw, 32px);
   position: relative;
   z-index: 1;
-  backdrop-filter: blur(18px);
 }
 
 .loading {
   font-size: 1.15rem;
-  color: var(--text-muted);
+  color: rgb(189, 189, 189);
   text-align: center;
 }
 
@@ -453,48 +452,38 @@ const handleRestInput = (event: Event) => {
   flex-wrap: wrap;
 }
 
+.headerActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
 .title {
-  font-size: clamp(1.7rem, 5vw, 2.7rem);
-  color: var(--text-primary);
+  font-size: 1.3rem;
+  color: rgb(245, 245, 245);
   font-weight: 900;
   letter-spacing: 0.01em;
 }
 
+.soundButton,
 .backButton {
   width: 28px;
   height: 28px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--chip-border);
-  background: var(--chip-bg);
+  background: transparent;
   padding: 0;
   cursor: pointer;
   border-radius: 50%;
-  box-shadow: var(--shadow-light);
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  border: none;
+  box-shadow: none;
+  transition: transform 160ms ease, opacity 160ms ease;
 }
 
+.soundButton:hover,
 .backButton:hover {
   transform: translateY(-1px);
-  box-shadow: var(--shadow-strong);
-}
-
-.soundButton {
-  border: 1px solid var(--chip-border);
-  background: color-mix(in srgb, var(--chip-bg), transparent 15%);
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-weight: 800;
-  font-size: 0.95rem;
-  color: var(--text-primary);
-  cursor: pointer;
-  box-shadow: var(--shadow-light);
-  transition: transform 160ms ease, box-shadow 160ms ease;
-}
-
-.soundButton:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-strong);
+  opacity: 0.8;
 }
 
 .section {
@@ -516,24 +505,25 @@ const handleRestInput = (event: Event) => {
 
 .label {
   font-size: 0.95rem;
-  color: var(--text-muted);
+  color: rgb(189, 189, 189);
   font-weight: 700;
 }
 
 .input {
   width: 100%;
-  border: 1px solid var(--input-border);
   border-radius: 10px;
   padding: 10px 12px;
-  background: linear-gradient(180deg, var(--surface-1), var(--input-bg));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--panel-border), transparent 35%);
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  background: rgb(40, 40, 40);
+  box-shadow: inset 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: box-shadow 160ms ease;
+  border: 1px solid rgb(82, 82, 82);
+  color: rgb(245, 245, 245);
 }
 
 .input:focus {
   outline: none;
-  border-color: var(--input-focus);
-  box-shadow: 0 0 0 3px var(--input-ring);
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.3);
+  border-color: #f97316;
 }
 
 .compactNumberInput {
@@ -550,24 +540,23 @@ const handleRestInput = (event: Event) => {
 }
 
 .card {
-  border: 1px solid color-mix(in srgb, var(--panel-border), transparent 30%);
-  background: linear-gradient(140deg, var(--surface-1), var(--surface-2) 45%, var(--surface-1));
+  background: rgb(66, 66, 66);
   border-radius: 18px;
-  padding: 14px;
+  padding: 14px 14px 14px 0;
   margin-bottom: 12px;
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-rows: auto auto;
   align-items: start;
-  column-gap: 10px;
-  gap: 10px;
-  box-shadow: var(--shadow-med);
+  column-gap: 4px;
+  row-gap: 10px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
 }
 
 .card:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-strong);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 .cardDragging {
@@ -577,26 +566,21 @@ const handleRestInput = (event: Event) => {
 }
 
 .cardDropTarget {
-  border-color: color-mix(in srgb, var(--theme-main), #7c3aed 35%);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme-main), #c4b5fd 35%);
+  box-shadow: 0 0 0 4px #f97316;
 }
 
 .dragHandle {
   grid-column: 1;
   grid-row: 1 / span 2;
-  align-self: center;
-  width: 22px;
-  height: 22px;
-  display: grid;
-  place-items: center;
+  align-self: stretch;
+  width: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   user-select: none;
   cursor: grab;
   touch-action: none;
   padding: 0;
-  background: var(--chip-bg);
-  border-radius: 10px;
-  border: 1px solid var(--chip-border);
-  box-shadow: var(--shadow-med);
 }
 
 .cardTopRow {
@@ -637,7 +621,7 @@ const handleRestInput = (event: Event) => {
 
 .unitText {
   font-weight: 800;
-  color: var(--text-soft);
+  color: rgb(189, 189, 189);
   white-space: nowrap;
 }
 
@@ -646,12 +630,12 @@ const handleRestInput = (event: Event) => {
   height: 24px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--chip-border);
   padding: 0;
-  background: color-mix(in srgb, var(--chip-bg), #fff1f2 35%);
+  background: rgb(82, 82, 82);
   cursor: pointer;
   border-radius: 50%;
-  box-shadow: var(--shadow-med);
+  border: none;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
 }
 
 .deleteIconButton:disabled {
@@ -661,22 +645,26 @@ const handleRestInput = (event: Event) => {
 
 .addCardButton {
   width: 100%;
-  border: 1px dashed color-mix(in srgb, var(--theme-main), #ffffff 35%);
-  background: color-mix(in srgb, var(--surface-1), transparent 30%);
-  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  color: rgb(245, 245, 245);
   font-weight: 800;
   font-size: 1.05rem;
   border-radius: 16px;
   padding: 14px 16px;
   cursor: pointer;
-  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
-  box-shadow: var(--shadow-light);
+  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
+  box-shadow: none;
+  border: 2px dashed rgba(245, 245, 245, 0.4);
 }
 
 .addCardButton:hover {
   transform: translateY(-1px);
-  box-shadow: var(--shadow-strong);
-  border-color: color-mix(in srgb, var(--theme-main), #ffffff 15%);
+  background-color: rgba(245, 245, 245, 0.08);
+  border-color: rgba(245, 245, 245, 0.7);
 }
 
 .visuallyHidden {
@@ -694,12 +682,16 @@ const handleRestInput = (event: Event) => {
   .page {
     padding: 12px;
   }
+  
+  .panel {
+    padding: 16px;
+    border-radius: 24px;
+  }
 
   .dragHandle {
     margin-bottom: 0;
   }
 }
-
 </style>
 
 

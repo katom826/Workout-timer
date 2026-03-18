@@ -1,5 +1,5 @@
 <template>
-  <p class="seconds" :class="{ secondsNice: isNice, secondsCompleted: isCompleted }">
+  <p class="seconds" :class="{ secondsNice: isNice, secondsCompleted: isCompleted, secondsLetsGo: seconds === 'Let’s Go!' }">
     <ScreenFill
       v-if="showFill"
       :fill-ratio-a="fillRatioA"

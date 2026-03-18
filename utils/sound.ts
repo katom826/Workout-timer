@@ -1,4 +1,6 @@
-﻿export type SoundConfig = {
+import { ref, watch } from "vue";
+
+export type SoundConfig = {
   seEnabled: boolean;
   bgmEnabled: boolean;
 };
@@ -15,8 +17,8 @@ const normalizeSoundConfig = (config: Partial<SoundConfig>): SoundConfig => ({
   bgmEnabled: typeof config.bgmEnabled === "boolean" ? config.bgmEnabled : true
 });
 
-export const loadSoundConfig = (): SoundConfig => {
-  if (import.meta.server) {
+const loadSoundConfig = (): SoundConfig => {
+  if (typeof window === "undefined") {
     return DEFAULT_SOUND_CONFIG;
   }
 
@@ -33,11 +35,20 @@ export const loadSoundConfig = (): SoundConfig => {
   }
 };
 
-export const saveSoundConfig = (config: SoundConfig): void => {
-  if (import.meta.server) {
-    return;
-  }
+export const soundConfig = ref<SoundConfig>(loadSoundConfig());
 
-  localStorage.setItem(SOUND_CONFIG_KEY, JSON.stringify(normalizeSoundConfig(config)));
-  window.dispatchEvent(new CustomEvent("sound-config-updated"));
-};
+if (typeof window !== "undefined") {
+  watch(
+    soundConfig,
+    (config) => {
+      localStorage.setItem(SOUND_CONFIG_KEY, JSON.stringify(normalizeSoundConfig(config)));
+    },
+    { deep: true }
+  );
+
+  window.addEventListener("storage", (event) => {
+    if (event.key === SOUND_CONFIG_KEY) {
+      soundConfig.value = loadSoundConfig();
+    }
+  });
+}

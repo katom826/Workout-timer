@@ -1,7 +1,7 @@
 ﻿<template>
   <div class="repSection">
     <p class="repText">
-      <span>残り回数 {{ currentRep }} / {{ totalReps }}</span>
+      <span>{{ currentRep }} / {{ totalReps }} 回</span>
       <span v-if="setLabel" class="repSetLabel">{{ setLabel }}</span>
     </p>
     <div class="repGauge" aria-hidden="true">

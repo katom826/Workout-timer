@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <main :class="['page', isResting ? 'restTheme' : 'workTheme']">
     <audio ref="tickSoundRef" src="/audio/tick.mp3" preload="auto" />
     <audio ref="repChangeSoundRef" src="/audio/rep_change.mp3" preload="auto" />
@@ -63,7 +63,7 @@ import {
   type WorkoutConfig,
   loadWorkoutConfig
 } from "~/utils/workoutConfig";
-import { loadSoundConfig } from "~/utils/soundConfig";
+import { soundConfig } from "~/utils/sound";
 
 type TimerPhase = "idle" | "workout" | "rest" | "completed";
 
@@ -72,7 +72,7 @@ type WorkoutStep = {
   exerciseIndex: number;
 };
 
-const PHASE_TRANSITION_DELAY_MS = 240;
+const PHASE_TRANSITION_DELAY_MS = 1000;
 const REP_PREP_DELAY_MS = 1000;
 const COMPLETION_DELAY_MS = 900;
 
@@ -139,6 +139,8 @@ const pendingStep = ref<WorkoutStep | null>(null);
 const activeFillLayer = ref<0 | 1>(0);
 const fadeLayer = ref<0 | 1>(1);
 const fadeToken = ref(0);
+const fadeLayerRatio = ref(0);
+const previousPhase = ref<TimerPhase>("idle");
 
 const tickSoundRef = ref<HTMLAudioElement | null>(null);
 const repChangeSoundRef = ref<HTMLAudioElement | null>(null);
@@ -149,7 +151,6 @@ const countdownEndAt = ref<number | null>(null);
 const countdownFinished = ref(false);
 const transitionTimer = ref<number | null>(null);
 const prepTimer = ref<number | null>(null);
-const seEnabled = ref(true);
 const isPrepDelay = ref(false);
 const repPulseIndex = ref<number | null>(null);
 
@@ -287,13 +288,10 @@ const handleCountdownComplete = () => {
   }, PHASE_TRANSITION_DELAY_MS);
 };
 
-const syncSoundConfig = () => {
-  const updated = loadSoundConfig();
-  seEnabled.value = updated.seEnabled;
-};
+
 
 const playSe = (audio: HTMLAudioElement | null) => {
-  if (!audio || !seEnabled.value) {
+  if (!audio || !soundConfig.value.seEnabled) {
     return;
   }
   audio.currentTime = 0;
@@ -317,10 +315,7 @@ const applyInitialState = (loadedConfig: WorkoutConfig) => {
 onMounted(() => {
   const loadedConfig = loadWorkoutConfig();
   config.value = loadedConfig;
-  syncSoundConfig();
   applyInitialState(loadedConfig);
-  window.addEventListener("sound-config-updated", syncSoundConfig);
-  window.addEventListener("storage", syncSoundConfig);
 });
 
 const currentExercise = computed<ExerciseConfig | null>(() => {
@@ -392,7 +387,9 @@ watch(
 
 watch(
   () => phase.value,
-  (next) => {
+  (next, prev) => {
+    previousPhase.value = prev;
+
     if (next !== "completed") {
       return;
     }
@@ -409,6 +406,12 @@ watch(
     }
 
     if (typeof previous === "number" && next > previous) {
+      if (phase.value === "workout" && previousPhase.value === "rest") {
+        fadeLayerRatio.value = 0;
+      } else {
+        fadeLayerRatio.value = 1;
+      }
+      
       fadeLayer.value = activeFillLayer.value;
       activeFillLayer.value = activeFillLayer.value === 0 ? 1 : 0;
       fadeToken.value = fadeToken.value + 1;
@@ -453,9 +456,6 @@ const isZeroMoment = computed(
 const isNiceMoment = computed(() => isPrepDelay.value || isZeroMoment.value);
 
 const timerFill = computed(() => {
-  if (isZeroMoment.value) {
-    return 1;
-  }
   return isResting.value ? remainingRatio.value : elapsedRatio.value;
 });
 
@@ -465,10 +465,10 @@ const setLabel = computed(() =>
 );
 
 const fillRatioA = computed(() =>
-  activeFillLayer.value === 0 ? timerFill.value : fadeLayer.value === 0 ? 1 : 0
+  activeFillLayer.value === 0 ? timerFill.value : fadeLayer.value === 0 ? fadeLayerRatio.value : 0
 );
 const fillRatioB = computed(() =>
-  activeFillLayer.value === 1 ? timerFill.value : fadeLayer.value === 1 ? 1 : 0
+  activeFillLayer.value === 1 ? timerFill.value : fadeLayer.value === 1 ? fadeLayerRatio.value : 0
 );
 const isResumeState = computed(() => !isRunning.value && phase.value !== "idle" && !isCompleted.value);
 
@@ -502,7 +502,7 @@ const displaySeconds = computed(() => {
     return "おつかれさまでした！";
   }
   if (isZeroMoment.value && isResting.value) {
-    return "Fight!";
+    return "Let’s Go!";
   }
   if (isNiceMoment.value) {
     return "Nice!";
@@ -518,20 +518,18 @@ onBeforeUnmount(() => {
   if (prepTimer.value) {
     window.clearTimeout(prepTimer.value);
   }
-  window.removeEventListener("sound-config-updated", syncSoundConfig);
-  window.removeEventListener("storage", syncSoundConfig);
 });
 </script>
 
 <style scoped>
 .page {
   min-height: 100vh;
-  padding: 28px;
+  padding: clamp(16px, 3vw, 24px);
   display: grid;
   place-items: center;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(150deg, var(--bg-1), var(--bg-2) 45%, var(--bg-3));
+  background: rgb(33, 33, 33);
 }
 
 .page::after {
@@ -550,24 +548,18 @@ onBeforeUnmount(() => {
 
 .timerCard,
 .completedCard {
-  width: min(680px, 100%);
-  border-radius: 30px;
-  background: var(--panel-surface);
-  border: 1px solid var(--panel-border);
-  box-shadow: var(--panel-shadow);
-  padding: clamp(20px, 5vw, 44px);
+  width: min(760px, 100%);
+  border-radius: 28px;
+  background: rgb(48, 48, 48);
+  border: none;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+  padding: clamp(20px, 4vw, 32px);
   position: relative;
   z-index: 2;
-  overflow: hidden;
-  backdrop-filter: blur(18px);
-}
-
-.timerCard {
-  padding-top: calc(clamp(20px, 5vw, 44px) + 18px);
 }
 
 .loading {
-  color: var(--text-muted);
+  color: rgb(189, 189, 189);
   font-size: 1.2rem;
   font-weight: 700;
 }
@@ -580,18 +572,18 @@ onBeforeUnmount(() => {
   height: 28px;
   display: grid;
   place-items: center;
-  border: 1px solid color-mix(in srgb, var(--theme-main), var(--panel-border) 55%);
+  border: none;
   padding: 0;
-  background: color-mix(in srgb, var(--chip-bg) 70%, transparent);
+  background: transparent;
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: var(--shadow-light);
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  box-shadow: none;
+  transition: transform 160ms ease, opacity 160ms ease;
 }
 
 :global(.settingsButton:hover) {
   transform: translateY(-1px);
-  box-shadow: var(--shadow-strong);
+  opacity: 0.8;
 }
 
 :global(.setLabel) {
@@ -603,7 +595,7 @@ onBeforeUnmount(() => {
 :global(.currentExerciseLabel) {
   font-size: 1.3rem;
   font-weight: 800;
-  color: #f97316;
+  color: var(--theme-main);
   letter-spacing: 0.02em;
   margin-bottom: 8px;
   display: flex;
@@ -614,7 +606,7 @@ onBeforeUnmount(() => {
 :global(.nextInlineLabel) {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #ffffff;
+  color: rgb(245, 245, 245);
   opacity: 0.9;
   letter-spacing: 0.02em;
   margin-left: auto;
@@ -624,7 +616,7 @@ onBeforeUnmount(() => {
 :global(.nextRestLabel) {
   font-size: 1.05rem;
   font-weight: 700;
-  color: #ffffff;
+  color: rgb(245, 245, 245);
   letter-spacing: 0.02em;
 }
 
@@ -632,7 +624,7 @@ onBeforeUnmount(() => {
   margin-top: 8px;
   font-size: clamp(1.6rem, 4vw, 2.5rem);
   font-weight: 900;
-  color: var(--text-primary);
+  color: rgb(245, 245, 245);
   min-height: 1.8em;
   letter-spacing: 0.01em;
 }
@@ -653,10 +645,9 @@ onBeforeUnmount(() => {
   font-size: clamp(5.2rem, 19vw, 11rem);
   font-weight: 900;
   letter-spacing: 0.04em;
-  color: var(--text-primary);
-  text-shadow: 0 1px 0 color-mix(in srgb, var(--panel-border), transparent 40%);
-  font-family: "Space Grotesk", "Noto Sans JP", sans-serif;
-  border: 2px solid color-mix(in srgb, var(--theme-main), #ffffff 35%);
+  color: rgb(245, 245, 245);
+  text-shadow: none;
+  border: 2px solid color-mix(in srgb, var(--theme-main), rgb(48, 48, 48) 35%);
   border-radius: 22px;
   overflow: hidden;
   isolation: isolate;
@@ -670,15 +661,16 @@ onBeforeUnmount(() => {
   padding: 0 16px;
 }
 
+:global(.secondsLetsGo) {
+  font-size: clamp(3rem, 11vw, 7rem);
+  white-space: nowrap;
+}
+
 :global(.secondsText) {
   position: relative;
   z-index: 2;
   display: inline-block;
   animation: secondsPop 220ms ease-out;
-}
-
-:global(.secondsNice .fillLayer) {
-  transition: none;
 }
 
 @keyframes secondsPop {
@@ -707,11 +699,11 @@ onBeforeUnmount(() => {
   align-items: baseline;
   font-size: 1.3rem;
   font-weight: 800;
-  color: var(--text-soft);
+  color: rgb(189, 189, 189);
 }
 
 :global(.repSetLabel) {
-  color: #ffffff;
+  color: rgb(245, 245, 245);
   font-weight: 800;
   font-size: 1.05rem;
   letter-spacing: 0.02em;
@@ -738,7 +730,7 @@ onBeforeUnmount(() => {
 :global(.repSegment) {
   height: 16px;
   border-radius: 4px;
-  background: color-mix(in srgb, var(--panel-border), transparent 65%);
+  background: rgb(82, 82, 82);
   box-shadow: none;
 }
 
@@ -776,17 +768,18 @@ onBeforeUnmount(() => {
   font-size: clamp(1.2rem, 3vw, 1.6rem);
   font-weight: 900;
   cursor: pointer;
-  color: #ffffff;
-  background: color-mix(in srgb, #0b1020, var(--theme-main) 18%);
-  box-shadow: none;
+  color: rgb(245, 245, 245);
+  background: rgb(66, 66, 66);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
   position: relative;
   overflow: hidden;
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
 
 :global(.primaryButton:hover) {
   transform: translateY(-1px);
-  box-shadow: none;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  background-color: rgb(82, 82, 82);
 }
 
 :global(.primaryButtonNoShadow),
@@ -801,7 +794,7 @@ onBeforeUnmount(() => {
 .completedText {
   font-size: clamp(2.2rem, 8vw, 4.2rem);
   font-weight: 900;
-  color: var(--text-primary);
+  color: rgb(245, 245, 245);
 }
 
 :global(.confettiLayer) {
@@ -861,7 +854,6 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  mix-blend-mode: multiply;
 }
 
 :global(.fillLayer) {
@@ -869,14 +861,9 @@ onBeforeUnmount(() => {
   inset-inline: 0;
   inset-block-end: 0;
   block-size: calc(var(--fill-ratio) * 100%);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--theme-main), #ffffff 30%),
-    color-mix(in srgb, var(--theme-main), #0f172a 5%)
-  );
-  transition: block-size 1000ms linear;
+  background: var(--theme-main);
   opacity: 1;
-  box-shadow: 0 -30px 60px color-mix(in srgb, var(--theme-main), transparent 60%);
+  box-shadow: 0 -30px 60px color-mix(in srgb, var(--theme-main) 30%, transparent);
   transform: translateZ(0);
   backface-visibility: hidden;
   will-change: block-size;
@@ -899,12 +886,12 @@ onBeforeUnmount(() => {
 
 @media (max-width: 640px) {
   .page {
-    padding: 16px;
+    padding: 12px;
   }
 
   .timerCard,
   .completedCard {
-    border-radius: 20px;
+    border-radius: 24px;
     padding: 16px;
   }
 

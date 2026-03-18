@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <main class="page">
     <section class="panel">
       <header class="header">
@@ -10,23 +10,17 @@
 
       <div class="toggleList">
         <div class="toggleRow">
-          <div>
-            <p class="toggleTitle">SE</p>
-            <p class="toggleDesc">効果音のオン・オフ</p>
-          </div>
+          <p class="toggleTitle">SE</p>
           <label class="switch">
-            <input type="checkbox" :checked="seEnabled" @change="toggleSe" />
+            <input type="checkbox" :checked="soundConfig.seEnabled" @change="toggleSe" />
             <span class="slider" />
           </label>
         </div>
 
         <div class="toggleRow">
-          <div>
-            <p class="toggleTitle">BGM</p>
-            <p class="toggleDesc">BGMのオン・オフ</p>
-          </div>
+          <p class="toggleTitle">BGM</p>
           <label class="switch">
-            <input type="checkbox" :checked="bgmEnabled" @change="toggleBgm" />
+            <input type="checkbox" :checked="soundConfig.bgmEnabled" @change="toggleBgm" />
             <span class="slider" />
           </label>
         </div>
@@ -36,53 +30,38 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
-import { loadSoundConfig, saveSoundConfig } from "~/utils/soundConfig";
+import { soundConfig } from "~/utils/sound";
 
 const router = useRouter();
-const seEnabled = ref(true);
-const bgmEnabled = ref(true);
-
-onMounted(() => {
-  const config = loadSoundConfig();
-  seEnabled.value = config.seEnabled;
-  bgmEnabled.value = config.bgmEnabled;
-});
-
-watch([seEnabled, bgmEnabled], () => {
-  saveSoundConfig({ seEnabled: seEnabled.value, bgmEnabled: bgmEnabled.value });
-});
 
 const toggleSe = (event: Event) => {
-  seEnabled.value = (event.target as HTMLInputElement).checked;
+  soundConfig.value.seEnabled = (event.target as HTMLInputElement).checked;
 };
 
 const toggleBgm = (event: Event) => {
-  bgmEnabled.value = (event.target as HTMLInputElement).checked;
+  soundConfig.value.bgmEnabled = (event.target as HTMLInputElement).checked;
 };
 </script>
 
 <style scoped>
 .page {
   min-height: 100vh;
-  padding: 24px;
+  padding: clamp(16px, 3vw, 24px);
   --theme-main: #f97316;
-  background: linear-gradient(160deg, var(--bg-1), var(--bg-2) 45%, var(--bg-3));
+  background: rgb(33, 33, 33);
   position: relative;
   overflow: hidden;
 }
 
 .panel {
-  width: min(720px, 100%);
+  width: min(760px, 100%);
   margin-inline: auto;
-  border-radius: 26px;
-  border: 1px solid var(--panel-border);
-  background: var(--panel-surface);
-  box-shadow: var(--panel-shadow-soft);
-  padding: clamp(16px, 3vw, 32px);
+  border-radius: 28px;
+  background: rgb(48, 48, 48);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+  padding: clamp(20px, 4vw, 32px);
   position: relative;
   z-index: 1;
-  backdrop-filter: blur(18px);
 }
 
 .header {
@@ -93,8 +72,8 @@ const toggleBgm = (event: Event) => {
 }
 
 .title {
-  font-size: clamp(1.7rem, 5vw, 2.5rem);
-  color: var(--text-primary);
+  font-size: 1.3rem;
+  color: rgb(245, 245, 245);
   font-weight: 900;
   letter-spacing: 0.01em;
 }
@@ -104,18 +83,18 @@ const toggleBgm = (event: Event) => {
   height: 28px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--chip-border);
-  background: var(--chip-bg);
+  background: transparent;
   padding: 0;
   cursor: pointer;
   border-radius: 50%;
-  box-shadow: var(--shadow-light);
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  border: none;
+  box-shadow: none;
+  transition: transform 160ms ease, opacity 160ms ease;
 }
 
 .backButton:hover {
   transform: translateY(-1px);
-  box-shadow: var(--shadow-strong);
+  opacity: 0.8;
 }
 
 .toggleList {
@@ -131,20 +110,14 @@ const toggleBgm = (event: Event) => {
   gap: 16px;
   padding: 16px 18px;
   border-radius: 18px;
-  border: 1px solid color-mix(in srgb, var(--panel-border), transparent 35%);
-  background: linear-gradient(140deg, var(--surface-1), var(--surface-2) 45%, var(--surface-1));
-  box-shadow: var(--shadow-med);
+  background: rgb(66, 66, 66);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .toggleTitle {
   font-size: 1.1rem;
   font-weight: 800;
-  color: var(--text-primary);
-}
-
-.toggleDesc {
-  font-size: 0.9rem;
-  color: var(--text-muted);
+  color: rgb(245, 245, 245);
 }
 
 .switch {
@@ -164,7 +137,7 @@ const toggleBgm = (event: Event) => {
   position: absolute;
   cursor: pointer;
   inset: 0;
-  background: color-mix(in srgb, var(--panel-border), transparent 55%);
+  background: rgb(82, 82, 82);
   border-radius: 999px;
   transition: background 160ms ease;
 }
@@ -178,12 +151,12 @@ const toggleBgm = (event: Event) => {
   top: 4px;
   background: #ffffff;
   border-radius: 50%;
-  box-shadow: 0 8px 18px #0f172a26;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
   transition: transform 160ms ease;
 }
 
 .switch input:checked + .slider {
-  background: color-mix(in srgb, var(--theme-main), #0b1020 35%);
+  background: var(--theme-main);
 }
 
 .switch input:checked + .slider::before {
@@ -192,11 +165,12 @@ const toggleBgm = (event: Event) => {
 
 @media (max-width: 640px) {
   .page {
-    padding: 16px;
+    padding: 12px;
   }
 
   .panel {
     padding: 16px;
+    border-radius: 24px;
   }
 }
 </style>
