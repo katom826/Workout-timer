@@ -802,7 +802,7 @@ onBeforeUnmount(() => {
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  z-index: 18;
+  z-index: 1;
 }
 
 :global(.confetti) {
